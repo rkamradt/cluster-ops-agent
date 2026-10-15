@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cluster Ops Agent — kamradtfamily.net</title>
+  <style>
+    :root {
+      --bg: #0a0e14;
+      --surface: #111820;
+      --border: #1e2d3d;
+      --accent: #00e5ff;
+      --accent2: #39ff14;
+      --warn: #ff6b35;
+      --text: #cdd6f4;
+      --muted: #6c7a8a;
+      --font-mono: "JetBrains Mono", "Fira Code", monospace;
+      --font-ui: "Inter", system-ui, sans-serif;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-ui);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Nav ── */
+    nav {
+      border-bottom: 1px solid var(--border);
+      padding: 0.75rem 1.5rem;
+      display: flex;
+      align-items: center;
+      gap: 1.5rem;
+      font-size: 0.8rem;
+      color: var(--muted);
+    }
+    nav .logo { color: var(--accent); font-family: var(--font-mono); font-size: 0.9rem; }
+    nav a { color: var(--muted); text-decoration: none; }
+    nav a:hover { color: var(--accent); }
+
+    /* ── Layout ── */
+    main {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 1fr min(680px, 100%) 1fr;
+      padding: 2rem 1rem;
+      gap: 1.5rem;
+    }
+    .center { grid-column: 2; display: flex; flex-direction: column; gap: 1.5rem; }
+
+    /* ── Header ── */
+    .header h1 {
+      font-family: var(--font-mono);
+      font-size: 1.4rem;
+      color: var(--accent);
+      letter-spacing: 0.05em;
+    }
+    .header p { color: var(--muted); font-size: 0.85rem; margin-top: 0.4rem; }
+
+    /* ── Input area ── */
+    .input-area {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+    .input-row { display: flex; gap: 0.5rem; }
+    textarea {
+      flex: 1;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      font-family: var(--font-ui);
+      font-size: 0.9rem;
+      padding: 0.65rem 0.85rem;
+      resize: vertical;
+      min-height: 64px;
+      transition: border-color 0.2s;
+    }
+    textarea:focus { outline: none; border-color: var(--accent); }
+    button.send {
+      background: var(--accent);
+      color: #000;
+      border: none;
+      border-radius: 6px;
+      font-weight: 700;
+      font-size: 0.85rem;
+      padding: 0 1.2rem;
+      cursor: pointer;
+      align-self: flex-end;
+      height: 40px;
+      transition: opacity 0.15s;
+    }
+    button.send:hover { opacity: 0.85; }
+    button.send:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* ── Canned questions ── */
+    .canned { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+    .canned button {
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      color: var(--muted);
+      font-size: 0.75rem;
+      padding: 0.3rem 0.6rem;
+      cursor: pointer;
+      transition: border-color 0.2s, color 0.2s;
+    }
+    .canned button:hover { border-color: var(--accent); color: var(--accent); }
+
+    /* ── Progress strip ── */
+    #progress {
+      display: none;
+      align-items: center;
+      gap: 0.6rem;
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      color: var(--accent);
+      padding: 0.5rem 0;
+    }
+    #progress.active { display: flex; }
+    .spinner {
+      width: 14px; height: 14px;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Answer pane ── */
+    #answer {
+      display: none;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.25rem 1.5rem;
+    }
+    #answer.visible { display: block; }
+    #answer-text {
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      line-height: 1.65;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    #answer-text strong { color: var(--accent); }
+    .answer-label {
+      font-size: 0.7rem;
+      font-family: var(--font-mono);
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-bottom: 0.75rem;
+    }
+
+    /* ── Error ── */
+    .error-msg {
+      background: rgba(255,107,53,0.1);
+      border: 1px solid var(--warn);
+      border-radius: 6px;
+      color: var(--warn);
+      font-size: 0.82rem;
+      padding: 0.6rem 0.9rem;
+      display: none;
+    }
+    .error-msg.visible { display: block; }
+
+    /* ── How it works ── */
+    details {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+    }
+    summary {
+      padding: 0.85rem 1.25rem;
+      cursor: pointer;
+      font-size: 0.82rem;
+      color: var(--muted);
+      font-family: var(--font-mono);
+      user-select: none;
+      list-style: none;
+    }
+    summary::before { content: "▶  "; color: var(--accent); font-size: 0.65rem; }
+    details[open] summary::before { content: "▼  "; }
+    summary:hover { color: var(--text); }
+    .details-body { padding: 0 1.25rem 1.25rem; }
+    .details-body p {
+      font-size: 0.82rem;
+      color: var(--muted);
+      line-height: 1.6;
+      margin-bottom: 0.85rem;
+    }
+    .mermaid-wrap {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 1rem;
+      overflow-x: auto;
+    }
+    pre.mmd {
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      color: var(--muted);
+      white-space: pre;
+    }
+
+    /* ── Footer ── */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 0.75rem 1.5rem;
+      font-size: 0.72rem;
+      color: var(--muted);
+      display: flex;
+      gap: 1.5rem;
+      flex-wrap: wrap;
+    }
+    footer a { color: var(--muted); text-decoration: none; }
+    footer a:hover { color: var(--accent); }
+    .tag {
+      background: rgba(0,229,255,0.08);
+      border: 1px solid rgba(0,229,255,0.2);
+      border-radius: 3px;
+      font-family: var(--font-mono);
+      font-size: 0.68rem;
+      color: var(--accent);
+      padding: 0.1rem 0.4rem;
+    }
+  </style>
+</head>
+<body>
+
+<nav>
+  <span class="logo">// cluster-ops-agent</span>
+  <a href="https://cluster.kamradtfamily.net">dashboard</a>
+  <a href="https://www.kamradtfamily.net">oracle</a>
+  <a href="https://life.kamradtfamily.net">life</a>
+  <a href="https://profile.kamradtfamily.net">profile</a>
+</nav>
+
+<main>
+  <div class="center">
+
+    <div class="header">
+      <h1>Cluster Ops Agent</h1>
+      <p>Read-only AI agent powered by LangGraph + Llama 3.2 — asks your K3s cluster questions so you don't have to.</p>
+    </div>
+
+    <div class="input-area">
+      <div class="input-row">
+        <textarea
+          id="question"
+          placeholder="Ask about the cluster… e.g. 'Are there any crashlooping pods?'"
+          maxlength="500"
+          rows="2"
+        ></textarea>
+        <button class="send" id="send-btn" onclick="ask()">Ask</button>
+      </div>
+      <div class="canned">
+        <button onclick="prefill('List all pods in the home namespace')">pods in home</button>
+        <button onclick="prefill('Are there any unhealthy pods across all allowed namespaces?')">health check</button>
+        <button onclick="prefill('What is the ArgoCD sync status of the home app?')">ArgoCD: home</button>
+        <button onclick="prefill('Show me recent events in the k8s-dashboard namespace')">events: k8s-dashboard</button>
+        <button onclick="prefill('Is there anything crashlooping or OOMKilled right now?')">crashloops?</button>
+      </div>
+    </div>
+
+    <div id="progress">
+      <div class="spinner"></div>
+      <span id="progress-label">starting…</span>
+    </div>
+
+    <div class="error-msg" id="error-msg"></div>
+
+    <div id="answer">
+      <div class="answer-label">Answer</div>
+      <div id="answer-text"></div>
+    </div>
+
+    <details>
+      <summary>How this works</summary>
+      <div class="details-body">
+        <p>
+          <span class="tag">LangGraph</span>&nbsp;
+          A <strong>StateGraph</strong> with typed state drives the conversation.
+          The <em>agent</em> node runs Llama 3.2 with five read-only tools bound.
+          After each tool call, a <em>validate</em> node checks the arguments
+          (retrying once if malformed). A <em>tools</em> node executes the call
+          against the live cluster via the Kubernetes API. If the result shows
+          an unhealthy pod or application (CrashLoopBackOff, OOMKilled, Degraded…),
+          the graph routes to a focused <em>diagnose</em> node that produces a
+          structured "likely cause / evidence / next check" report.
+          The loop is capped at 6 steps so a confused model can't spin.
+        </p>
+        <p>
+          <span class="tag">Safety</span>&nbsp;
+          The ServiceAccount has get/list/watch on pods, events, and ArgoCD
+          Applications only — no secrets, no configmaps, no exec, no writes.
+          An application-layer namespace allowlist prevents queries outside the
+          visible set. All output is redacted (IPs, tokens, connection strings)
+          before it reaches the LLM or the page.
+        </p>
+        <p>
+          <span class="tag">Graph</span>&nbsp;
+          Live Mermaid diagram from <code>app.get_graph().draw_mermaid()</code>:
+        </p>
+        <div class="mermaid-wrap">
+          <pre class="mmd" id="mmd-src">loading…</pre>
+        </div>
+      </div>
+    </details>
+
+  </div>
+</main>
+
+<footer>
+  <span>read-only · CPU Llama 3.2 · K3s · LangGraph 1.2</span>
+  <a href="https://github.com/rkamradt/cluster-ops-agent">source</a>
+  <a href="https://profile.kamradtfamily.net">Randy Kamradt Sr.</a>
+</footer>
+
+<script>
+  // Load the Mermaid diagram source lazily when the details panel is opened
+  document.querySelector('details').addEventListener('toggle', async function() {
+    if (!this.open) return;
+    const pre = document.getElementById('mmd-src');
+    if (pre.textContent !== 'loading…') return;
+    try {
+      const r = await fetch('/graph.mmd');
+      pre.textContent = r.ok ? await r.text() : '(diagram unavailable)';
+    } catch { pre.textContent = '(diagram unavailable)'; }
+  });
+
+  function prefill(text) {
+    document.getElementById('question').value = text;
+    document.getElementById('question').focus();
+  }
+
+  function setProgress(label) {
+    const el = document.getElementById('progress');
+    el.classList.toggle('active', !!label);
+    document.getElementById('progress-label').textContent = label || '';
+  }
+
+  function showError(msg) {
+    const el = document.getElementById('error-msg');
+    el.textContent = msg;
+    el.classList.add('visible');
+  }
+
+  function clearError() {
+    document.getElementById('error-msg').classList.remove('visible');
+  }
+
+  function showAnswer(text) {
+    const el = document.getElementById('answer');
+    el.classList.add('visible');
+    // Minimal markdown: bold **...** and bullet points
+    const html = text
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+      .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>');
+    document.getElementById('answer-text').innerHTML = html;
+  }
+
+  async function ask() {
+    const q = document.getElementById('question').value.trim();
+    if (!q) return;
+
+    clearError();
+    document.getElementById('answer').classList.remove('visible');
+    document.getElementById('send-btn').disabled = true;
+    setProgress('starting…');
+
+    const url = `/ask?question=${encodeURIComponent(q)}`;
+    const es = new EventSource(url);
+
+    const nodeLabels = {
+      agent: 'thinking…',
+      validate: 'validating tool call…',
+      tools: 'querying cluster…',
+      diagnose: 'diagnosing…',
+    };
+
+    es.addEventListener('progress', e => {
+      const d = JSON.parse(e.data);
+      setProgress(nodeLabels[d.node] || d.label || d.node + '…');
+    });
+
+    es.addEventListener('answer', e => {
+      const d = JSON.parse(e.data);
+      showAnswer(d.content || '(no answer)');
+    });
+
+    es.addEventListener('done', () => {
+      es.close();
+      setProgress(null);
+      document.getElementById('send-btn').disabled = false;
+    });
+
+    es.addEventListener('error', e => {
+      es.close();
+      setProgress(null);
+      document.getElementById('send-btn').disabled = false;
+      try {
+        const d = JSON.parse(e.data);
+        showError(d.message || 'An error occurred.');
+      } catch {
+        showError('Connection lost. Please try again.');
+      }
+    });
+
+    // Fallback: close if SSE itself errors (network drop, rate limit)
+    es.onerror = () => {
+      es.close();
+      setProgress(null);
+      document.getElementById('send-btn').disabled = false;
+    };
+  }
+
+  // Submit on Ctrl+Enter / Cmd+Enter
+  document.getElementById('question').addEventListener('keydown', e => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') ask();
+  });
+</script>
+</body>
+</html>
