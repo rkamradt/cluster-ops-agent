@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: broken-test
+  namespace: cluster-ops-agent
+  labels:
+    app: broken-test
+    purpose: diagnose-demo
+spec:
+  containers:
+    - name: crasher
+      image: busybox:latest
+      command:
+        - sh
+        - -c
+        - |
+          echo "Starting service..."
+          echo "INFO: connecting to database at db.internal:5432"
+          echo "ERROR: connection refused after 3 attempts"
+          echo "FATAL: could not initialize data store, exiting"
+          exit 1
+  restartPolicy: Always

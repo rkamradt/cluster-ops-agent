@@ -73,7 +73,7 @@ The FastAPI `/ask` endpoint is a [Server-Sent Events](https://developer.mozilla.
 ## Design trade-offs
 
 **Small CPU-only model (Llama 3.2 3B Q4)**
-The cluster runs on a single old HP server with no GPU. Llama 3.2 3B fits in RAM and produces usable tool calls, but it's slow (~30–90s per question) and occasionally generates malformed JSON arguments. The `validate` node exists specifically to catch and recover from this — it retries once with a corrective message before failing gracefully. The SSE progress stream makes the wait feel like work, not a hang.
+The cluster runs on a single old HP server with no GPU. Llama 3.2 3B fits in RAM and produces usable tool calls, but it's slow (~30–120s per question) and occasionally generates malformed JSON arguments. The `validate` node exists specifically to catch and recover from this — it retries once with a corrective message before failing gracefully. The SSE progress stream makes the wait feel like work, not a hang. Broad questions like "check all namespaces" can time out because the model calls each namespace sequentially; narrow questions ("pods in home") work reliably.
 
 **Read-only tools and namespace allowlist**
 The ServiceAccount has `get/list/watch` on pods, pod logs, events, and ArgoCD Applications only. No secrets, configmaps, exec, or writes — anything not listed is denied by RBAC. On top of that, an application-layer allowlist in `config.py` prevents the LLM from querying namespaces outside the approved set even if the SA could technically reach them.
