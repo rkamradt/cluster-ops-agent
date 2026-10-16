@@ -21,8 +21,11 @@ OLLAMA_TIMEOUT: float = float(os.environ.get("OLLAMA_TIMEOUT", "120"))
 # Graph limits
 MAX_STEPS: int = int(os.environ.get("MAX_STEPS", "6"))
 
-# SQLite checkpointer path (PVC mount in cluster)
-DB_PATH: str = os.environ.get("DB_PATH", "/data/checkpoints.db")
+# SQLite checkpointer path — defaults to ./data/ locally, overridden to /data/ in cluster
+DB_PATH: str = os.environ.get(
+    "DB_PATH",
+    os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "checkpoints.db"),
+)
 
 # Rate limiting
 RATE_LIMIT_MAX: int = int(os.environ.get("RATE_LIMIT_MAX", "20"))
