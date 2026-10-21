@@ -9,6 +9,12 @@ NAMESPACE_ALLOWLIST: list[str] = os.environ.get(
     "home,k8s-dashboard,gol,portfolio,llm,cluster-ops-agent",
 ).split(",")
 
+# ArgoCD application names the agent is allowed to inspect
+ARGOCD_APP_ALLOWLIST: list[str] = os.environ.get(
+    "ARGOCD_APP_ALLOWLIST",
+    "home,k8s-dashboard,gol,portfolio,llm,cluster-ops-agent",
+).split(",")
+
 # Ollama settings
 OLLAMA_URL: str = os.environ.get(
     "OLLAMA_URL", "http://ollama.llm.svc.cluster.local:11434"

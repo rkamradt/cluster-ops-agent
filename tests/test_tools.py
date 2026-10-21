@@ -229,3 +229,61 @@ class TestArgoCDAppStatus:
         result = await argocd_app_status.ainvoke({"app": "k8s-dashboard"})
         for key in ("name", "sync", "health", "conditions", "resources"):
             assert key in result, f"Missing key: {key}"
+
+    async def test_unlisted_app_raises(self):
+        from app.tools import argocd_app_status
+
+        with pytest.raises(ValueError, match="allowlist"):
+            await argocd_app_status.ainvoke({"app": "keycloak"})
+
+
+# ── _assert_name path-traversal / injection tests ─────────────────────────────
+
+
+@pytest.mark.asyncio
+class TestAssertName:
+    """Ensure _assert_name blocks all path-traversal and invalid inputs."""
+
+    @pytest.mark.parametrize(
+        "bad_name",
+        [
+            "../../keycloak",          # classic path traversal
+            "../keycloak",             # single step up
+            "%2e%2e/keycloak",         # URL-encoded dot-dot (should fail regex)
+            "Home-Pod",                # uppercase → fails regex
+            "home pod",                # space → fails regex
+            "",                        # empty
+            "/etc/passwd",             # absolute path
+            "a" * 254,                 # too long
+        ],
+    )
+    async def test_path_traversal_pod_logs(self, bad_name):
+        from app.tools import pod_logs
+
+        with pytest.raises(ValueError):
+            await pod_logs.ainvoke({"namespace": "home", "pod": bad_name})
+
+    @pytest.mark.parametrize(
+        "bad_name",
+        [
+            "../../keycloak",
+            "../keycloak",
+            "%2e%2e/keycloak",
+            "Home-Pod",
+            "",
+            "/etc/passwd",
+        ],
+    )
+    async def test_path_traversal_get_pod_status(self, bad_name):
+        from app.tools import get_pod_status
+
+        with pytest.raises(ValueError):
+            await get_pod_status.ainvoke({"namespace": "home", "pod": bad_name})
+
+    async def test_valid_pod_name_passes(self):
+        """A well-formed pod name must not be rejected."""
+        from app.tools import pod_logs
+
+        # Should not raise — FakeK8sClient returns canned text
+        result = await pod_logs.ainvoke({"namespace": "home", "pod": "home-6d4f9b-xyz"})
+        assert isinstance(result, str)

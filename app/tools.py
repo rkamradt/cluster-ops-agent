@@ -5,11 +5,23 @@ All output is passed through the redactor before being returned.
 """
 from __future__ import annotations
 
+import re
+
 from langchain_core.tools import tool
 
-from app.config import NAMESPACE_ALLOWLIST
+from app.config import ARGOCD_APP_ALLOWLIST, NAMESPACE_ALLOWLIST
 from app.k8s import get_k8s_client
 from app.redactor import redact, redact_obj
+
+# Kubernetes name grammar: lowercase alphanumeric, hyphens and dots only.
+# RFC 1123 label: max 63 chars; subdomain: max 253.  We use 253 for both.
+_K8S_NAME = re.compile(r"^[a-z0-9]([-a-z0-9.]{0,251}[a-z0-9])?$")
+
+
+def _assert_name(value: str, kind: str) -> None:
+    """Raise ValueError if *value* is not a valid, safe Kubernetes name."""
+    if not _K8S_NAME.fullmatch(value or "") or ".." in value:
+        raise ValueError(f"Invalid {kind} name: {value!r}")
 
 
 def _assert_namespace(namespace: str) -> None:
@@ -60,6 +72,7 @@ async def list_pods(namespace: str) -> list[dict]:
 async def get_pod_status(namespace: str, pod: str) -> dict:
     """Get detailed status for a specific pod, including conditions and container states."""
     _assert_namespace(namespace)
+    _assert_name(pod, "pod")
     client = get_k8s_client()
     data = await client.get_json(f"/api/v1/namespaces/{namespace}/pods/{pod}")
     status = data.get("status", {})
@@ -118,6 +131,7 @@ async def recent_events(namespace: str, limit: int = 20) -> list[dict]:
 async def pod_logs(namespace: str, pod: str, tail_lines: int = 100) -> str:
     """Fetch the last *tail_lines* lines of logs from a pod (max 200). Output is redacted."""
     _assert_namespace(namespace)
+    _assert_name(pod, "pod")
     tail_lines = min(tail_lines, 200)
     client = get_k8s_client()
     raw = await client.get_text(
@@ -129,6 +143,12 @@ async def pod_logs(namespace: str, pod: str, tail_lines: int = 100) -> str:
 @tool
 async def argocd_app_status(app: str) -> dict:
     """Get the sync and health status of an ArgoCD Application by name (reads the CRD directly)."""
+    _assert_name(app, "app")
+    if app not in ARGOCD_APP_ALLOWLIST:
+        raise ValueError(
+            f"ArgoCD app '{app}' is not in the allowlist. "
+            f"Allowed: {', '.join(ARGOCD_APP_ALLOWLIST)}"
+        )
     client = get_k8s_client()
     data = await client.get_json(
         f"/apis/argoproj.io/v1alpha1/namespaces/argocd/applications/{app}"
